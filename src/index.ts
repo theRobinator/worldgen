@@ -7,12 +7,15 @@ const waterLevelInput = document.getElementById('waterlevel') as HTMLInputElemen
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
-const ITERATIONS = 1;
+const ITERATIONS = 500;
 const MAX_ELEVATION = 500;
 const MIN_ELEVATION = -500;
 
 let WATER_LEVEL = 0;
 let MOUNTAIN_LEVEL = 150;
+
+let X_OFFSET = 0;
+let Y_OFFSET = 0;
 
 // Spectrum from dark blue to light green
 const GROUND_COLOR_BOUNDS = {
@@ -89,38 +92,41 @@ function addFault(heightMap: number[][], shouldRepaint: boolean = true) {
 	}
 	const centerX = Math.random() * WIDTH;
 	const centerY = Math.random() * HEIGHT;
+	const radius = Math.min(WIDTH, HEIGHT) / 3;
 
-	const intercept = centerY - slope * centerX;
+	const radiusSquared = radius * radius;
 
 	// Increase everything above the line and decrease below the line
 	const diff = Math.random() < 0.5 ? 1 : -1;
 	const threshold = 7;
-	const distanceDivisor = Math.sqrt(1 + slope * slope)
 
 	for (let x = 0; x < WIDTH; ++x) {
+		let testX = x;
+		if (Math.abs(x - centerX) > radius + threshold) {
+			if (x > centerX) {
+				testX -= WIDTH;
+			} else {
+				testX += WIDTH;
+			}
+		}
+		const dx = testX - centerX;
 		for (let y = 0; y < HEIGHT; ++y) {
-			// Hard-line raise/lower whole hemispheres
-			// if (slope * x + intercept < y) {
-			// 	heightMap[x][y] = Math.min(heightMap[x][y] + diff, MAX_ELEVATION);
-			// } else {
-			// 	heightMap[x][y] = Math.max(heightMap[x][y] - diff, MIN_ELEVATION);
-			// }
+			let testY = y;
+			if (Math.abs(y - centerY) > radius + threshold) {
+				if (y > centerY) {
+					testY -= HEIGHT;
+				} else {
+					testY += HEIGHT;
+				}
+			}
+			const dy = testY - centerY;
 
-			// Raise/lower single trench using a gradient
-			// let distanceFromLine = Math.abs(intercept + slope * x - y) / distanceDivisor;
-			// if (distanceFromLine < 0) {
-			// 	distanceFromLine = -distanceFromLine;
-			// }
-			// if (distanceFromLine < threshold) {
-			// 	heightMap[x][y] = Math.max(Math.min(heightMap[x][y] + diff * (threshold - distanceFromLine) / 2, MAX_ELEVATION), MIN_ELEVATION);
-			// }
-
-			// Raise/lower whole hemisphere using gradient line
-			let distanceFromLine = Math.abs(intercept + slope * x - y) / distanceDivisor;
+			let distanceFromLine = Math.sqrt(dx*dx + dy*dy) - radius;
 			if (distanceFromLine < 0) {
 				distanceFromLine = -distanceFromLine;
 			}
-			if (slope * x + intercept < y) {
+
+			if (dx*dx + dy*dy < radiusSquared) {
 				if (distanceFromLine < threshold) {
 					heightMap[x][y] = Math.min(heightMap[x][y] + diff * distanceFromLine, MAX_ELEVATION);
 				} else {
@@ -145,9 +151,11 @@ function paint(heightMap: number[][]) {
 	const imageData = context.getImageData(0, 0, WIDTH, HEIGHT);
 	const dataArr = imageData.data;
 	for (let y = 0; y < HEIGHT; ++y) {
+		const rowOffset = y * WIDTH * 4;
+		const yCoord = (y + HEIGHT + Y_OFFSET) % HEIGHT;
 		for (let x = 0; x < WIDTH; ++x) {
-			const base = y * WIDTH * 4 + x * 4;
-			const color = colorForElevation(heightMap[x][y]);
+			const base = rowOffset + x * 4;
+			const color = colorForElevation(heightMap[(x + WIDTH + X_OFFSET) % WIDTH][yCoord]);
 			dataArr[base] = color[0];  // Red
 			dataArr[base + 1] = color[1];  // Green
 			dataArr[base + 2] = color[2];  // Blue
@@ -188,24 +196,36 @@ function updateWaterLevel(heightMap: number[][]) {
 }
 waterLevelInput.value = WATER_LEVEL + '';
 
+function updateXOffset(newValue: string) {
+	X_OFFSET = parseInt(newValue, 10) % WIDTH;
+	paint(elevation);
+}
+(document.querySelector('input[name="xoffset"]') as HTMLInputElement).value = X_OFFSET + '';
+
+function updateYOffset(newValue: string) {
+	Y_OFFSET = parseInt(newValue, 10) % HEIGHT;
+	paint(elevation);
+}
+(document.querySelector('input[name="yoffset"]') as HTMLInputElement).value = Y_OFFSET + '';
+
 window.addEventListener('load', function() {
 	// paint(elevation);
 
-	generateFull(elevation);
+	// generateFull(elevation);
 
 
-	// let count = 0;
-	// let totalTime = 0;
-	// const interval = setInterval(function() {
-	// 	const last = window.performance.now();
-	// 	addFault(elevation);
-	// 	totalTime += window.performance.now() - last;
-	// 	count++;
-	// 	if (count >= ITERATIONS) {
-	// 		clearInterval(interval);
-	// 		console.log('Average time: ', totalTime / ITERATIONS)
-	// 	}
-	// }, 0);
+	let count = 0;
+	let totalTime = 0;
+	const interval = setInterval(function() {
+		const last = window.performance.now();
+		addFault(elevation);
+		totalTime += window.performance.now() - last;
+		count++;
+		if (count >= ITERATIONS) {
+			clearInterval(interval);
+			console.log('Average time: ', totalTime / ITERATIONS)
+		}
+	}, 0);
 });
 canvas.addEventListener('click', function() {
 	reset();

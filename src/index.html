@@ -5,7 +5,11 @@
 </head>
 <body>
 	<canvas id="map" width="1200" height="600"></canvas>
-	<input type="range" min="-100" max="100" id="waterlevel" onchange="updateWaterLevel(elevation)" />
+	<form style="float: right">
+		Water level: <input type="range" min="-100" max="100" id="waterlevel" onchange="updateWaterLevel(elevation)" />
+		X <input type="number" name="xoffset" onchange="updateXOffset(this.value)">
+		Y <input type="number" name="yoffset" onchange="updateYOffset(this.value)">
+	</form>
 
 	<script type="text/javascript" src="index.js"></script>
 </body>
