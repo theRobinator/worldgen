@@ -208,26 +208,58 @@ function updateYOffset(newValue: string) {
 }
 (document.querySelector('input[name="yoffset"]') as HTMLInputElement).value = Y_OFFSET + '';
 
+(function() {
+	let dragging = false;
+	let origX = NaN;
+	let origY = NaN;
+	let origXOffset = NaN;
+	let origYOffset = NaN;
+	canvas.addEventListener('mousedown', function(event) {
+		dragging = true;
+		origX = event.clientX;
+		origY = event.clientY;
+		origXOffset = X_OFFSET;
+		origYOffset = Y_OFFSET;
+	});
+	canvas.addEventListener('mousemove', function(event) {
+		if (dragging) {
+			X_OFFSET = (origXOffset + origX - event.clientX) % WIDTH;
+			Y_OFFSET = (origYOffset + origY - event.clientY) % HEIGHT;
+			paint(elevation);
+		}
+	});
+	function stopDragging() {
+		dragging = false;
+	}
+	canvas.addEventListener('mouseleave', stopDragging);
+	canvas.addEventListener('mouseup', stopDragging);
+})();
+
 window.addEventListener('load', function() {
 	// paint(elevation);
 
-	// generateFull(elevation);
+	generateFull(elevation);
 
 
-	let count = 0;
-	let totalTime = 0;
-	const interval = setInterval(function() {
-		const last = window.performance.now();
-		addFault(elevation);
-		totalTime += window.performance.now() - last;
-		count++;
-		if (count >= ITERATIONS) {
-			clearInterval(interval);
-			console.log('Average time: ', totalTime / ITERATIONS)
-		}
-	}, 0);
+	// let count = 0;
+	// let totalTime = 0;
+	// const interval = setInterval(function() {
+	// 	const last = window.performance.now();
+	// 	addFault(elevation);
+	// 	totalTime += window.performance.now() - last;
+	// 	count++;
+	// 	if (count >= ITERATIONS) {
+	// 		clearInterval(interval);
+	// 		console.log('Average time: ', totalTime / ITERATIONS)
+	// 	}
+	// }, 0);
 });
-canvas.addEventListener('click', function() {
+
+function regenerate() {
 	reset();
 	generateFull(elevation);
-});
+}
+// canvas.addEventListener('click', function() {
+// 	reset();
+// 	generateFull(elevation);
+// });
