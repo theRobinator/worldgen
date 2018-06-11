@@ -3,6 +3,8 @@ const context = canvas.getContext('2d');
 const elevation: number[][] = [];
 
 const waterLevelInput = document.getElementById('waterlevel') as HTMLInputElement;
+const xOffsetInput = document.querySelector('input[name="xoffset"]') as HTMLInputElement
+const yOffsetInput = document.querySelector('input[name="yoffset"]') as HTMLInputElement
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -40,34 +42,19 @@ const WATER_COLOR_BOUNDS = {
 reset();
 
 function reset() {
+	WATER_LEVEL = 0;
+	X_OFFSET = 0;
+	Y_OFFSET = 0;
+	yOffsetInput.value = Y_OFFSET + '';
+	xOffsetInput.value = X_OFFSET + '';
+	waterLevelInput.value = WATER_LEVEL + '';
+
 	const radius = Math.min(WIDTH, HEIGHT) / 2;
 	const step = -MIN_ELEVATION / radius;
 	for (let x = 0; x < WIDTH; ++x) {
 		elevation[x] = [];
 		for (let y = 0; y < HEIGHT; ++y) {
-			// if (x < radius) {
-			// 	if (y < x) {
-			// 		elevation[x][y] = MIN_ELEVATION + y * step;
-			// 	} else if (x > HEIGHT - y) {
-			// 		elevation[x][y] = MIN_ELEVATION + (HEIGHT - y) * step;
-			// 	} else {
-			// 		elevation[x][y] = MIN_ELEVATION + x * step;
-			// 	}
-			// } else if (x > WIDTH - radius) {
-			// 	if (WIDTH - x > y) {
-			// 		elevation[x][y] = MIN_ELEVATION + y * step;
-			// 	} else if (WIDTH - x > HEIGHT - y) {
-			// 		elevation[x][y] = MIN_ELEVATION + (HEIGHT - y) * step;
-			// 	} else {
-			// 		elevation[x][y] = MIN_ELEVATION + (WIDTH - x) * step;
-			// 	}
-			// } else  if (y < radius) {
-			// 	elevation[x][y] = MIN_ELEVATION + y * step;
-			// } else if (y > HEIGHT - radius) {
-			// 	elevation[x][y] = MIN_ELEVATION + (HEIGHT - y) * step;
-			// } else {
-				elevation[x][y] = 0;
-			// }
+			elevation[x][y] = 0;
 		}
 	}
 }
@@ -194,20 +181,18 @@ function updateWaterLevel(heightMap: number[][]) {
 	MOUNTAIN_LEVEL = WATER_LEVEL + 150;
 	paint(heightMap);
 }
-waterLevelInput.value = WATER_LEVEL + '';
 
 function updateXOffset(newValue: string) {
 	X_OFFSET = parseInt(newValue, 10) % WIDTH;
 	paint(elevation);
 }
-(document.querySelector('input[name="xoffset"]') as HTMLInputElement).value = X_OFFSET + '';
 
 function updateYOffset(newValue: string) {
 	Y_OFFSET = parseInt(newValue, 10) % HEIGHT;
 	paint(elevation);
 }
-(document.querySelector('input[name="yoffset"]') as HTMLInputElement).value = Y_OFFSET + '';
 
+// Dragging functionality
 (function() {
 	let dragging = false;
 	let origX = NaN;
@@ -230,6 +215,8 @@ function updateYOffset(newValue: string) {
 	});
 	function stopDragging() {
 		dragging = false;
+		xOffsetInput.value = X_OFFSET + '';
+		yOffsetInput.value = Y_OFFSET + '';
 	}
 	canvas.addEventListener('mouseleave', stopDragging);
 	canvas.addEventListener('mouseup', stopDragging);
@@ -239,7 +226,6 @@ window.addEventListener('load', function() {
 	// paint(elevation);
 
 	generateFull(elevation);
-
 
 	// let count = 0;
 	// let totalTime = 0;
@@ -259,7 +245,3 @@ function regenerate() {
 	reset();
 	generateFull(elevation);
 }
-// canvas.addEventListener('click', function() {
-// 	reset();
-// 	generateFull(elevation);
-// });
