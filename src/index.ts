@@ -1,6 +1,7 @@
+let Module: {[key: string]: any};
+
 const canvas = document.getElementById('map') as HTMLCanvasElement;
 const context = canvas.getContext('2d');
-const elevation: number[][] = [];
 
 const waterLevelInput = document.getElementById('waterlevel') as HTMLInputElement;
 const xOffsetInput = document.querySelector('input[name="xoffset"]') as HTMLInputElement
@@ -9,7 +10,10 @@ const yOffsetInput = document.querySelector('input[name="yoffset"]') as HTMLInpu
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
-const ITERATIONS = 500;
+let elevationPointer: number;
+let elevation: Float64Array;
+
+const ITERATIONS = 1000;
 const MAX_ELEVATION = 500;
 const MIN_ELEVATION = -500;
 
@@ -38,8 +42,12 @@ const WATER_COLOR_BOUNDS = {
 	blue: [153, 255],
 };
 
-// Initialize memory
-reset();
+interface ElevationCModule {
+	createBaseMap(width: number, height: number): number;
+	generateElevations(mapPointer: number, width: number, height: number, iterations: number): void;
+	resetMap(mapPointer: number, width: number, height: number): void;
+}
+let cModule: ElevationCModule;
 
 function reset() {
 	WATER_LEVEL = 0;
@@ -51,90 +59,18 @@ function reset() {
 
 	const radius = Math.min(WIDTH, HEIGHT) / 2;
 	const step = -MIN_ELEVATION / radius;
-	for (let x = 0; x < WIDTH; ++x) {
-		elevation[x] = [];
-		for (let y = 0; y < HEIGHT; ++y) {
-			elevation[x][y] = 0;
-		}
-	}
+	cModule.resetMap(elevationPointer, WIDTH, HEIGHT);
 }
 
-function generateFull(heightMap: number[][]) {
-	for (let i = 0; i < ITERATIONS; ++i) {
-		addFault(heightMap, false);
-	}
+function generateFull(mapPointer: number, map: Float64Array) {
+	const before = performance.now();
+	cModule.generateElevations(mapPointer, WIDTH, HEIGHT, ITERATIONS);
+	console.log('Average time', (performance.now() - before) / ITERATIONS);
 
-	paint(heightMap);
+	paint(map);
 }
 
-function addFault(heightMap: number[][], shouldRepaint: boolean = true) {
-	// Pick a random line on the plane
-	let slope = Math.random() * 10;
-	const orientationFlag = Math.random();
-	if (orientationFlag < 0.5) {
-		slope = 1 / slope;
-	}
-	if (orientationFlag < 0.25 || orientationFlag >= 0.75) {
-		slope = -slope;
-	}
-	const centerX = Math.random() * WIDTH;
-	const centerY = Math.random() * HEIGHT;
-	const radius = Math.min(WIDTH, HEIGHT) / 3;
-
-	const radiusSquared = radius * radius;
-
-	// Increase everything above the line and decrease below the line
-	const diff = Math.random() < 0.5 ? 1 : -1;
-	const threshold = 7;
-
-	for (let x = 0; x < WIDTH; ++x) {
-		let testX = x;
-		if (Math.abs(x - centerX) > radius + threshold) {
-			if (x > centerX) {
-				testX -= WIDTH;
-			} else {
-				testX += WIDTH;
-			}
-		}
-		const dx = testX - centerX;
-		for (let y = 0; y < HEIGHT; ++y) {
-			let testY = y;
-			if (Math.abs(y - centerY) > radius + threshold) {
-				if (y > centerY) {
-					testY -= HEIGHT;
-				} else {
-					testY += HEIGHT;
-				}
-			}
-			const dy = testY - centerY;
-
-			let distanceFromLine = Math.sqrt(dx*dx + dy*dy) - radius;
-			if (distanceFromLine < 0) {
-				distanceFromLine = -distanceFromLine;
-			}
-
-			if (dx*dx + dy*dy < radiusSquared) {
-				if (distanceFromLine < threshold) {
-					heightMap[x][y] = Math.min(heightMap[x][y] + diff * distanceFromLine, MAX_ELEVATION);
-				} else {
-					heightMap[x][y] = Math.min(heightMap[x][y] + diff * threshold, MAX_ELEVATION);
-				}
-			} else {
-				if (distanceFromLine < threshold) {
-					heightMap[x][y] = Math.max(heightMap[x][y] - diff * distanceFromLine, MIN_ELEVATION);
-				} else {
-					heightMap[x][y] = Math.max(heightMap[x][y] - diff * threshold, MIN_ELEVATION);
-				}
-			}
-		}
-	}
-
-	if (shouldRepaint) {
-		paint(heightMap);
-	}
-}
-
-function paint(heightMap: number[][]) {
+function paint(heightMap: Float64Array) {
 	const imageData = context.getImageData(0, 0, WIDTH, HEIGHT);
 	const dataArr = imageData.data;
 	for (let y = 0; y < HEIGHT; ++y) {
@@ -142,7 +78,7 @@ function paint(heightMap: number[][]) {
 		const yCoord = (y + HEIGHT + Y_OFFSET) % HEIGHT;
 		for (let x = 0; x < WIDTH; ++x) {
 			const base = rowOffset + x * 4;
-			const color = colorForElevation(heightMap[(x + WIDTH + X_OFFSET) % WIDTH][yCoord]);
+			const color = colorForElevation(heightMap[yCoord * WIDTH + ((x + WIDTH + X_OFFSET) % WIDTH)]);
 			dataArr[base] = color[0];  // Red
 			dataArr[base + 1] = color[1];  // Green
 			dataArr[base + 2] = color[2];  // Blue
@@ -176,10 +112,10 @@ function colorForElevation(elevation: number): [number, number, number] {
 	];
 }
 
-function updateWaterLevel(heightMap: number[][]) {
+function updateWaterLevel() {
 	WATER_LEVEL = parseInt(waterLevelInput.value);
 	MOUNTAIN_LEVEL = WATER_LEVEL + 150;
-	paint(heightMap);
+	paint(elevation);
 }
 
 function updateXOffset(newValue: string) {
@@ -222,10 +158,20 @@ function updateYOffset(newValue: string) {
 	canvas.addEventListener('mouseup', stopDragging);
 })();
 
-window.addEventListener('load', function() {
-	// paint(elevation);
+Module['onRuntimeInitialized'] = function() {
+	cModule = {
+		createBaseMap: Module.cwrap('createBaseMap', 'number', ['number', 'number']),
+		generateElevations: Module.cwrap('generateElevations', 'void', ['number', 'number', 'number', 'number']),
+		resetMap: Module.cwrap('resetMap', 'void', ['number', 'number', 'number']),
+	};
 
-	generateFull(elevation);
+	// Get pointer and reference to the created map
+	elevationPointer = cModule.createBaseMap(WIDTH, HEIGHT);
+
+	elevation = Module.HEAPF64.subarray(elevationPointer/8, elevationPointer/8 + WIDTH*HEIGHT);
+
+
+	generateFull(elevationPointer, elevation);
 
 	// let count = 0;
 	// let totalTime = 0;
@@ -239,9 +185,9 @@ window.addEventListener('load', function() {
 	// 		console.log('Average time: ', totalTime / ITERATIONS)
 	// 	}
 	// }, 0);
-});
+};
 
 function regenerate() {
 	reset();
-	generateFull(elevation);
+	generateFull(elevationPointer, elevation);
 }
