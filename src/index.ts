@@ -1,17 +1,19 @@
 const canvas = document.getElementById('map') as HTMLCanvasElement;
 const context = canvas.getContext('2d');
 const elevation: number[][] = [];
+const WORKERS: Worker[] = [];
 
 const waterLevelInput = document.getElementById('waterlevel') as HTMLInputElement;
 const xOffsetInput = document.querySelector('input[name="xoffset"]') as HTMLInputElement
 const yOffsetInput = document.querySelector('input[name="yoffset"]') as HTMLInputElement
 
-const WIDTH = canvas.width * 2;
-const HEIGHT = canvas.height * 2;
+const WIDTH = canvas.width * 3;
+const HEIGHT = canvas.height * 3;
 
-const ITERATIONS = 500;
-const MAX_ELEVATION = 500;
-const MIN_ELEVATION = -500;
+const ITERATIONS = 1000;
+const MAX_ELEVATION = 1000;
+const MIN_ELEVATION = -1000;
+const WORKER_COUNT = 4;
 
 let WATER_LEVEL = 0;
 let MOUNTAIN_LEVEL = 150;
@@ -19,7 +21,7 @@ let MOUNTAIN_LEVEL = 150;
 let X_OFFSET = 0;
 let Y_OFFSET = 0;
 
-let ZOOM_LEVEL = 2;
+let ZOOM_LEVEL = 3;
 
 // Spectrum from dark blue to light green
 const GROUND_COLOR_BOUNDS = {
@@ -42,6 +44,9 @@ const WATER_COLOR_BOUNDS = {
 
 // Initialize memory
 reset();
+for (let i = 0; i < WORKER_COUNT; ++i) {
+	WORKERS.push(new Worker('faultworker.js'));
+}
 
 function reset() {
 	WATER_LEVEL = 0;
@@ -51,8 +56,6 @@ function reset() {
 	xOffsetInput.value = X_OFFSET + '';
 	waterLevelInput.value = WATER_LEVEL + '';
 
-	const radius = Math.min(canvas.width, canvas.height) / 2;
-	const step = -MIN_ELEVATION / radius;
 	for (let x = 0; x < WIDTH; ++x) {
 		elevation[x] = [];
 		for (let y = 0; y < HEIGHT; ++y) {
@@ -63,78 +66,27 @@ function reset() {
 
 function generateFull(heightMap: number[][]) {
 	const before = performance.now();
-	for (let i = 0; i < ITERATIONS; ++i) {
-		addFault(heightMap, false);
-	}
-	console.log('Average time', (performance.now() - before) / ITERATIONS);
-
-	paint(heightMap);
-}
-
-function addFault(heightMap: number[][], shouldRepaint: boolean = true) {
-	// Pick a random line on the plane
-	let slope = Math.random() * 10;
-	const orientationFlag = Math.random();
-	if (orientationFlag < 0.5) {
-		slope = 1 / slope;
-	}
-	if (orientationFlag < 0.25 || orientationFlag >= 0.75) {
-		slope = -slope;
-	}
-	const centerX = Math.random() * WIDTH;
-	const centerY = Math.random() * HEIGHT;
-	const radius = Math.min(WIDTH, HEIGHT) / 3;
-
-	const radiusSquared = radius * radius;
-
-	// Increase everything above the line and decrease below the line
-	const diff = Math.random() < 0.5 ? 1 : -1;
-	const threshold = 7;
-
-	for (let x = 0; x < WIDTH; ++x) {
-		let testX = x;
-		if (Math.abs(x - centerX) > radius + threshold) {
-			if (x > centerX) {
-				testX -= WIDTH;
-			} else {
-				testX += WIDTH;
-			}
-		}
-		const dx = testX - centerX;
-		for (let y = 0; y < HEIGHT; ++y) {
-			let testY = y;
-			if (Math.abs(y - centerY) > radius + threshold) {
-				if (y > centerY) {
-					testY -= HEIGHT;
-				} else {
-					testY += HEIGHT;
+	let done = 0;
+	const iterationCount = Math.round(ITERATIONS / WORKER_COUNT);
+	for (let i = 0; i < WORKER_COUNT; ++i) {
+		const worker = WORKERS[i];
+		const listener = function(message: MessageEvent) {
+			console.log('got data back')
+			const data = message.data;
+			for (let x = 0; x < WIDTH; ++x) {
+				for (let y = 0; y < HEIGHT; ++y) {
+					heightMap[x][y] = Math.max(Math.min(heightMap[x][y] + data[x][y], MAX_ELEVATION), MIN_ELEVATION);
 				}
 			}
-			const dy = testY - centerY;
-
-			let distanceFromLine = Math.sqrt(dx*dx + dy*dy) - radius;
-			if (distanceFromLine < 0) {
-				distanceFromLine = -distanceFromLine;
+			done++;
+			if (done === WORKER_COUNT) {
+				console.log('Average time', (performance.now() - before) / ITERATIONS);
+				paint(heightMap);
 			}
-
-			if (dx*dx + dy*dy < radiusSquared) {
-				if (distanceFromLine < threshold) {
-					heightMap[x][y] = Math.min(heightMap[x][y] + diff * distanceFromLine, MAX_ELEVATION);
-				} else {
-					heightMap[x][y] = Math.min(heightMap[x][y] + diff * threshold, MAX_ELEVATION);
-				}
-			} else {
-				if (distanceFromLine < threshold) {
-					heightMap[x][y] = Math.max(heightMap[x][y] - diff * distanceFromLine, MIN_ELEVATION);
-				} else {
-					heightMap[x][y] = Math.max(heightMap[x][y] - diff * threshold, MIN_ELEVATION);
-				}
-			}
-		}
-	}
-
-	if (shouldRepaint) {
-		paint(heightMap);
+			worker.removeEventListener('message', listener);
+		};
+		worker.addEventListener('message', listener);
+		worker.postMessage(['buildElevationMap', iterationCount, WIDTH, HEIGHT]);
 	}
 }
 
@@ -151,17 +103,34 @@ function paint(heightMap: number[][]) {
 			const xCoord = (ZOOM_LEVEL * (x + WIDTH) + X_OFFSET) % WIDTH;
 
 			let aggregatedElevation = 0;
+			let nextX, nextY;
 			switch (ZOOM_LEVEL) {
 				case 1:
 					aggregatedElevation = heightMap[xCoord][yCoord];
 					break;
 				case 2:
-					let nextX = (xCoord + 1) % WIDTH;
-					let nextY = (yCoord + 1) % HEIGHT;
+					nextX = (xCoord + 1) % WIDTH;
+					nextY = (yCoord + 1) % HEIGHT;
 					aggregatedElevation = heightMap[xCoord][yCoord]
 										+ heightMap[nextX][yCoord]
 										+ heightMap[xCoord][nextY]
 										+ heightMap[nextX][nextY];
+					break;
+				case 3:
+					nextX = (xCoord + 1) % WIDTH;
+					nextY = (yCoord + 1) % HEIGHT;
+					let thirdX = (xCoord + 2) % WIDTH;
+					let thirdY = (yCoord + 2) % HEIGHT;
+
+					aggregatedElevation = heightMap[xCoord][yCoord]
+										+ heightMap[nextX][yCoord]
+										+ heightMap[thirdX][yCoord]
+										+ heightMap[xCoord][nextY]
+										+ heightMap[nextX][nextY]
+										+ heightMap[thirdX][nextY]
+										+ heightMap[xCoord][thirdY]
+										+ heightMap[nextX][thirdY]
+										+ heightMap[thirdX][thirdY];
 					break;
 
 			}
@@ -284,8 +253,8 @@ function updateZoomLevel(newValue: string, centerX?: number, centerY?: number) {
 			let newLevel = goingUp ? ZOOM_LEVEL - 1 : ZOOM_LEVEL + 1;
 			if (newLevel < 1) {
 				newLevel = 1;
-			} else if (newLevel > 2) {
-				newLevel = 2;
+			} else if (newLevel > 3) {
+				newLevel = 3;
 			}
 			if (newLevel != ZOOM_LEVEL) {
 				updateZoomLevel(newLevel + '', event.clientX, event.clientY);
@@ -322,4 +291,14 @@ window.addEventListener('load', function() {
 function regenerate() {
 	reset();
 	generateFull(elevation);
+	context.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function invert() {
+	for (let x = 0; x < WIDTH; ++x) {
+		for (let y = 0; y < HEIGHT; ++y) {
+			elevation[x][y] = -elevation[x][y];
+		}
+	}
+	paint(elevation);
 }
