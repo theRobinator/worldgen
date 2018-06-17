@@ -9,6 +9,7 @@
 		Water level: <input type="range" min="-100" max="100" id="waterlevel" onchange="updateWaterLevel(elevation)" />
 		X <input type="number" name="xoffset" onchange="updateXOffset(this.value)">
 		Y <input type="number" name="yoffset" onchange="updateYOffset(this.value)">
+		Zoom <input type="number" min="1" max="2" onchange="updateZoomLevel(this.value)">
 		<button onclick="regenerate()">Regenerate</button>
 	</form>
 

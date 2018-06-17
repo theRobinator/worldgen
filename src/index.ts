@@ -6,8 +6,8 @@ const waterLevelInput = document.getElementById('waterlevel') as HTMLInputElemen
 const xOffsetInput = document.querySelector('input[name="xoffset"]') as HTMLInputElement
 const yOffsetInput = document.querySelector('input[name="yoffset"]') as HTMLInputElement
 
-const WIDTH = canvas.width;
-const HEIGHT = canvas.height;
+const WIDTH = canvas.width * 2;
+const HEIGHT = canvas.height * 2;
 
 const ITERATIONS = 500;
 const MAX_ELEVATION = 500;
@@ -18,6 +18,8 @@ let MOUNTAIN_LEVEL = 150;
 
 let X_OFFSET = 0;
 let Y_OFFSET = 0;
+
+let ZOOM_LEVEL = 2;
 
 // Spectrum from dark blue to light green
 const GROUND_COLOR_BOUNDS = {
@@ -49,7 +51,7 @@ function reset() {
 	xOffsetInput.value = X_OFFSET + '';
 	waterLevelInput.value = WATER_LEVEL + '';
 
-	const radius = Math.min(WIDTH, HEIGHT) / 2;
+	const radius = Math.min(canvas.width, canvas.height) / 2;
 	const step = -MIN_ELEVATION / radius;
 	for (let x = 0; x < WIDTH; ++x) {
 		elevation[x] = [];
@@ -60,9 +62,11 @@ function reset() {
 }
 
 function generateFull(heightMap: number[][]) {
+	const before = performance.now();
 	for (let i = 0; i < ITERATIONS; ++i) {
 		addFault(heightMap, false);
 	}
+	console.log('Average time', (performance.now() - before) / ITERATIONS);
 
 	paint(heightMap);
 }
@@ -135,14 +139,35 @@ function addFault(heightMap: number[][], shouldRepaint: boolean = true) {
 }
 
 function paint(heightMap: number[][]) {
-	const imageData = context.getImageData(0, 0, WIDTH, HEIGHT);
+	const zoomDivisor = ZOOM_LEVEL * ZOOM_LEVEL;
+	const canvasWidth = canvas.width, canvasHeight = canvas.height;
+	const imageData = context.getImageData(0, 0, canvasWidth, canvasHeight);
 	const dataArr = imageData.data;
-	for (let y = 0; y < HEIGHT; ++y) {
-		const rowOffset = y * WIDTH * 4;
-		const yCoord = (y + HEIGHT + Y_OFFSET) % HEIGHT;
-		for (let x = 0; x < WIDTH; ++x) {
+
+	for (let y = 0; y < canvasHeight; ++y) {
+		const rowOffset = y * canvasWidth * 4;
+		const yCoord = (ZOOM_LEVEL * (y + HEIGHT) + Y_OFFSET) % HEIGHT;
+		for (let x = 0; x < canvasWidth; ++x) {
+			const xCoord = (ZOOM_LEVEL * (x + WIDTH) + X_OFFSET) % WIDTH;
+
+			let aggregatedElevation = 0;
+			switch (ZOOM_LEVEL) {
+				case 1:
+					aggregatedElevation = heightMap[xCoord][yCoord];
+					break;
+				case 2:
+					let nextX = (xCoord + 1) % WIDTH;
+					let nextY = (yCoord + 1) % HEIGHT;
+					aggregatedElevation = heightMap[xCoord][yCoord]
+										+ heightMap[nextX][yCoord]
+										+ heightMap[xCoord][nextY]
+										+ heightMap[nextX][nextY];
+					break;
+
+			}
+
+			const color = colorForElevation(aggregatedElevation / zoomDivisor);
 			const base = rowOffset + x * 4;
-			const color = colorForElevation(heightMap[(x + WIDTH + X_OFFSET) % WIDTH][yCoord]);
 			dataArr[base] = color[0];  // Red
 			dataArr[base + 1] = color[1];  // Green
 			dataArr[base + 2] = color[2];  // Blue
@@ -192,6 +217,29 @@ function updateYOffset(newValue: string) {
 	paint(elevation);
 }
 
+function updateZoomLevel(newValue: string, centerX?: number, centerY?: number) {
+	const newZoom = parseInt(newValue, 10);
+	const maxZoom = Math.max(ZOOM_LEVEL, newZoom);
+	if (centerX === undefined) {
+		centerX = Math.round(canvas.width / maxZoom);
+	}
+	if (centerY === undefined) {
+		centerY = Math.round(canvas.height / maxZoom);
+	}
+
+	if (newZoom > ZOOM_LEVEL) {
+		// Zooming out
+		X_OFFSET = (X_OFFSET - centerX + WIDTH) % WIDTH;
+		Y_OFFSET = (Y_OFFSET - centerY + HEIGHT) % HEIGHT;
+	} else {
+		// Zooming in
+		X_OFFSET = (X_OFFSET + centerX + WIDTH) % WIDTH;
+		Y_OFFSET = (Y_OFFSET + centerY + HEIGHT) % HEIGHT;
+	}
+	ZOOM_LEVEL = newZoom;
+	paint(elevation);
+}
+
 // Dragging functionality
 (function() {
 	let dragging = false;
@@ -208,8 +256,8 @@ function updateYOffset(newValue: string) {
 	});
 	canvas.addEventListener('mousemove', function(event) {
 		if (dragging) {
-			X_OFFSET = (origXOffset + origX - event.clientX) % WIDTH;
-			Y_OFFSET = (origYOffset + origY - event.clientY) % HEIGHT;
+			X_OFFSET = (origXOffset + (origX - event.clientX) * ZOOM_LEVEL) % WIDTH;
+			Y_OFFSET = (origYOffset + (origY - event.clientY) * ZOOM_LEVEL) % HEIGHT;
 			paint(elevation);
 		}
 	});
@@ -220,6 +268,36 @@ function updateYOffset(newValue: string) {
 	}
 	canvas.addEventListener('mouseleave', stopDragging);
 	canvas.addEventListener('mouseup', stopDragging);
+})();
+
+// Zooming functionality
+(function() {
+	let lastScrollTime = 0;
+	const isFirefox = /Firefox/i.test(navigator.userAgent);
+	canvas.addEventListener(isFirefox ? "DOMMouseScroll" : "mousewheel", function(event: {[key: string]: any}) {
+		const now = Date.now();
+		if (now > lastScrollTime + 1000) {  // Throttle to once per second
+			lastScrollTime = now;
+
+			const goingUp = isFirefox ? event.detail < 0 : event.wheelDeltaY > 0;
+
+			let newLevel = goingUp ? ZOOM_LEVEL - 1 : ZOOM_LEVEL + 1;
+			if (newLevel < 1) {
+				newLevel = 1;
+			} else if (newLevel > 2) {
+				newLevel = 2;
+			}
+			if (newLevel != ZOOM_LEVEL) {
+				updateZoomLevel(newLevel + '', event.clientX, event.clientY);
+			}
+		}
+		event.preventDefault();
+		event.stopPropagation();
+		return false;
+	});
+
+	canvas.addEventListener('mouseenter', e => document.body.style.overflow = 'hidden');
+	canvas.addEventListener('mouseleave', e => document.body.style.overflow = 'scroll');
 })();
 
 window.addEventListener('load', function() {
