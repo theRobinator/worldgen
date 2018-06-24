@@ -9,6 +9,7 @@
   "author": "Robin Keller",
   "license": "ISC",
   "dependencies": {
+    "almond": "^0.3.3",
     "typescript": "^2.9.1"
   }
 }

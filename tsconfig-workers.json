@@ -1,13 +1,11 @@
 {
 	"compilerOptions": {
 		"module": "amd",
-		"outFile": "dist/app.js",
+		"outFile": "dist/worker.js",
+		"lib": ["webworker", "es5", "scripthost"],
 		"noImplicitAny": true
 	},
 	"include": [
-		"src/**/*"
-	],
-	"exclude": [
 		"src/workers/**/*"
 	]
 }

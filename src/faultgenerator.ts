@@ -1,32 +1,35 @@
-onmessage = function(messageEvent) {
-	const [command, ...args]: [] = messageEvent.data;
-	const result = COMMANDS[command](...args);
-	postMessage(result);
-}
+export class FaultGenerator {
+	private heightMap: number[][] = [];
 
-const heightMap: number[][] = []];
-
-const _resetHeightMap = function(width: number, height: number) {
-	if (heightMap.length === 0) {
+	constructor(
+		private mapWidth: number,
+		private mapHeight: number,
+	) {
+		// Set up memory
 		const firstColumn: number[] = [];
-		firstColumn.length = height;
-		heightMap.push(firstColumn);
-		for (let x = 1; x < width; ++x) {
-			heightMap.push(firstColumn.slice());  // Native copy is probably faster than appending
+		firstColumn.length = mapHeight;
+		this.heightMap.push(firstColumn);
+		for (let x = 1; x < mapWidth; ++x) {
+			this.heightMap.push(firstColumn.slice());  // Native copy is probably faster than appending
 		}
 	}
-	for (let x = 0; x < width; ++x) {
-		heightMap[x].fill(0);
+
+	private resetHeightMap = function() {
+		const heightMap = this.heightMap;
+		for (let x = 0; x < this.mapWidth; ++x) {
+			heightMap[x].fill(0);
+		}
 	}
-}
 
-const COMMANDS = {
-	buildElevationMap: function(iterations: number, width: number, height: number) {
-		_resetHeightMap(width, height);
+	public regenerate(iterations: number) {
+		this.resetHeightMap();
 
+		const width = this.mapWidth;
+		const height = this.mapHeight;
 		const radius = Math.min(width, height) / 5;
 		const radiusSquared = radius * radius;
 		const threshold = 7;
+		const heightMap = this.heightMap;
 
 		for (let faultIndex = 0; faultIndex < iterations; ++faultIndex) {
 			// Pick a random line on the plane
@@ -87,5 +90,5 @@ const COMMANDS = {
 			}
 		}
 		return heightMap;
-	}
-};
+	};
+}

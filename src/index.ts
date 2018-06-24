@@ -1,3 +1,9 @@
+import {FaultGenerator} from './faultgenerator.js';
+
+
+const WorldGen: {[key: string]: any} = {};
+window.WorldGen = WorldGen;
+
 const canvas = document.getElementById('map') as HTMLCanvasElement;
 const context = canvas.getContext('2d');
 const elevation: number[][] = [];
@@ -45,7 +51,7 @@ const WATER_COLOR_BOUNDS = {
 // Initialize memory
 reset();
 for (let i = 0; i < WORKER_COUNT; ++i) {
-	WORKERS.push(new Worker('faultworker.js'));
+	WORKERS.push(new Worker('/workerbase.js'));
 }
 
 function reset() {
@@ -71,7 +77,6 @@ function generateFull(heightMap: number[][]) {
 	for (let i = 0; i < WORKER_COUNT; ++i) {
 		const worker = WORKERS[i];
 		const listener = function(message: MessageEvent) {
-			console.log('got data back')
 			const data = message.data;
 			for (let x = 0; x < WIDTH; ++x) {
 				for (let y = 0; y < HEIGHT; ++y) {
@@ -175,16 +180,19 @@ function updateWaterLevel(heightMap: number[][]) {
 	MOUNTAIN_LEVEL = WATER_LEVEL + 150;
 	paint(heightMap);
 }
+WorldGen['updateWaterLevel'] = updateWaterLevel;
 
 function updateXOffset(newValue: string) {
 	X_OFFSET = parseInt(newValue, 10) % WIDTH;
 	paint(elevation);
 }
+WorldGen['updateXOffset'] = updateXOffset;
 
 function updateYOffset(newValue: string) {
 	Y_OFFSET = parseInt(newValue, 10) % HEIGHT;
 	paint(elevation);
 }
+WorldGen['updateYOffset'] = updateYOffset;
 
 function updateZoomLevel(newValue: string, centerX?: number, centerY?: number) {
 	const newZoom = parseInt(newValue, 10);
@@ -208,6 +216,7 @@ function updateZoomLevel(newValue: string, centerX?: number, centerY?: number) {
 	ZOOM_LEVEL = newZoom;
 	paint(elevation);
 }
+WorldGen['updateZoomLevel'] = updateZoomLevel;
 
 // Dragging functionality
 (function() {
@@ -293,6 +302,7 @@ function regenerate() {
 	generateFull(elevation);
 	context.clearRect(0, 0, canvas.width, canvas.height);
 }
+WorldGen['regenerate'] = regenerate;
 
 function invert() {
 	for (let x = 0; x < WIDTH; ++x) {
@@ -302,3 +312,4 @@ function invert() {
 	}
 	paint(elevation);
 }
+WorldGen['invert'] = invert;
