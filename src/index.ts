@@ -7,6 +7,7 @@ window.WorldGen = WorldGen;
 const canvas = document.getElementById('map') as HTMLCanvasElement;
 const context = canvas.getContext('2d');
 const elevation: number[][] = [];
+
 const WORKERS: Worker[] = [];
 
 const waterLevelInput = document.getElementById('waterlevel') as HTMLInputElement;
@@ -50,6 +51,7 @@ const WATER_COLOR_BOUNDS = {
 
 // Initialize memory
 reset();
+const faultGenerator = new FaultGenerator(WIDTH, HEIGHT, elevation);
 for (let i = 0; i < WORKER_COUNT; ++i) {
 	WORKERS.push(new Worker('/workerbase.js'));
 }
@@ -72,23 +74,36 @@ function reset() {
 
 function generateFull(heightMap: number[][]) {
 	const before = performance.now();
+	let started = 0;
 	let done = 0;
 	const iterationCount = Math.round(ITERATIONS / WORKER_COUNT);
-	for (let i = 0; i < WORKER_COUNT; ++i) {
+	for (let i = 1; i < WORKER_COUNT; ++i) {
 		const worker = WORKERS[i];
 		const listener = function(message: MessageEvent) {
 			const data = message.data;
-			for (let x = 0; x < WIDTH; ++x) {
-				for (let y = 0; y < HEIGHT; ++y) {
-					heightMap[x][y] = Math.max(Math.min(heightMap[x][y] + data[x][y], MAX_ELEVATION), MIN_ELEVATION);
+			if (data['type'] === 'status') {
+				started++;
+				if (started === WORKER_COUNT - 1) {
+					// Start the main thread now that everything else is running
+					console.log('Main thread starting');
+					faultGenerator.regenerate(iterationCount);
+					console.log('Main thread complete');
 				}
+			} else if (data['type'] === 'result') {
+				console.log('Got data back');
+				const elevationDelta = data['data'];
+				for (let x = 0; x < WIDTH; ++x) {
+					for (let y = 0; y < HEIGHT; ++y) {
+						heightMap[x][y] = Math.max(Math.min(heightMap[x][y] + elevationDelta[x][y], MAX_ELEVATION), MIN_ELEVATION);
+					}
+				}
+				done++;
+				if (done === WORKER_COUNT - 1) {
+					console.log('Average time', (performance.now() - before) / ITERATIONS);
+					paint(heightMap);
+				}
+				worker.removeEventListener('message', listener);
 			}
-			done++;
-			if (done === WORKER_COUNT) {
-				console.log('Average time', (performance.now() - before) / ITERATIONS);
-				paint(heightMap);
-			}
-			worker.removeEventListener('message', listener);
 		};
 		worker.addEventListener('message', listener);
 		worker.postMessage(['buildElevationMap', iterationCount, WIDTH, HEIGHT]);
@@ -175,10 +190,10 @@ function colorForElevation(elevation: number): [number, number, number] {
 	];
 }
 
-function updateWaterLevel(heightMap: number[][]) {
+function updateWaterLevel() {
 	WATER_LEVEL = parseInt(waterLevelInput.value);
 	MOUNTAIN_LEVEL = WATER_LEVEL + 150;
-	paint(heightMap);
+	paint(elevation);
 }
 WorldGen['updateWaterLevel'] = updateWaterLevel;
 

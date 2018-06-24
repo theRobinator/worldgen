@@ -4,13 +4,18 @@ export class FaultGenerator {
 	constructor(
 		private mapWidth: number,
 		private mapHeight: number,
+		heightMap?: number[][],
 	) {
-		// Set up memory
-		const firstColumn: number[] = [];
-		firstColumn.length = mapHeight;
-		this.heightMap.push(firstColumn);
-		for (let x = 1; x < mapWidth; ++x) {
-			this.heightMap.push(firstColumn.slice());  // Native copy is probably faster than appending
+		if (heightMap) {
+			this.heightMap = heightMap;
+		} else {
+			// Set up memory for a private height map
+			const firstColumn: number[] = [];
+			firstColumn.length = mapHeight;
+			this.heightMap.push(firstColumn);
+			for (let x = 1; x < mapWidth; ++x) {
+				this.heightMap.push(firstColumn.slice());  // Native copy is probably faster than appending
+			}
 		}
 	}
 

@@ -6,12 +6,12 @@
 <body>
 	<canvas id="map" width="1200" height="600"></canvas>
 	<form style="float: right" onsubmit="return false">
-		Water level: <input type="range" min="-100" max="100" id="waterlevel" onchange="updateWaterLevel(elevation)" />
-		X <input type="number" name="xoffset" onchange="updateXOffset(this.value)">
-		Y <input type="number" name="yoffset" onchange="updateYOffset(this.value)">
-		Zoom <input type="number" min="1" max="3" onchange="updateZoomLevel(this.value)">
-		<button type="button" onclick="invert()">Invert</button>
-		<button type="button" onclick="regenerate()">Regenerate</button>
+		Water level: <input type="range" min="-100" max="100" id="waterlevel" onchange="WorldGen.updateWaterLevel()" />
+		X <input type="number" name="xoffset" onchange="WorldGen.updateXOffset(this.value)">
+		Y <input type="number" name="yoffset" onchange="WorldGen.updateYOffset(this.value)">
+		Zoom <input type="number" min="1" max="3" onchange="WorldGen.updateZoomLevel(this.value)">
+		<button type="button" onclick="WorldGen.invert()">Invert</button>
+		<button type="button" onclick="WorldGen.regenerate()">Regenerate</button>
 	</form>
 
 	<script type="text/javascript" src="node_modules/almond/almond.js"></script>
