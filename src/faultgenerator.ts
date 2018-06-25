@@ -37,15 +37,6 @@ export class FaultGenerator {
 		const heightMap = this.heightMap;
 
 		for (let faultIndex = 0; faultIndex < iterations; ++faultIndex) {
-			// Pick a random line on the plane
-			let slope = Math.random() * 10;
-			const orientationFlag = Math.random();
-			if (orientationFlag < 0.5) {
-				slope = 1 / slope;
-			}
-			if (orientationFlag < 0.25 || orientationFlag >= 0.75) {
-				slope = -slope;
-			}
 			const centerX = Math.random() * width;
 			const centerY = Math.random() * height;
 
