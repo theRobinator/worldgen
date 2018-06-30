@@ -100,6 +100,7 @@ function generateFull(heightMap: number[][]) {
 				done++;
 				if (done === WORKER_COUNT - 1) {
 					console.log('Average time', (performance.now() - before) / ITERATIONS);
+					setPercentWater(heightMap, 0.67);
 					paint(heightMap);
 				}
 				worker.removeEventListener('message', listener);
@@ -188,6 +189,22 @@ function colorForElevation(elevation: number): [number, number, number] {
 		(bounds.green[0] + (bounds.green[1] - bounds.green[0]) * percentElevation) | 0,
 		(bounds.blue[0] + (bounds.blue[1] - bounds.blue[0]) * percentElevation) | 0,
 	];
+}
+
+function setPercentWater(heightMap: number[][], percent: number) {
+	// Sort everything
+	const sortedPixels: number[] = [];
+	sortedPixels.length = WIDTH * HEIGHT;
+	for (let y = 0; y < HEIGHT; ++y) {
+		const rowBase = y * WIDTH;
+		for (let x = 0; x < WIDTH; ++x) {
+			sortedPixels[rowBase + x] = heightMap[x][y];
+		}
+	}
+	sortedPixels.sort((a, b) => a - b);
+
+	WATER_LEVEL = sortedPixels[Math.floor(WIDTH * HEIGHT * percent)];
+	waterLevelInput.value = WATER_LEVEL.toString();
 }
 
 function updateWaterLevel() {
