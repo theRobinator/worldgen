@@ -10,6 +10,7 @@ const elevation: number[][] = [];
 
 const WORKERS: Worker[] = [];
 
+const statusDisplay = document.getElementById('statusDisplay');
 const waterLevelInput = document.getElementById('waterlevel') as HTMLInputElement;
 const xOffsetInput = document.querySelector('input[name="xoffset"]') as HTMLInputElement
 const yOffsetInput = document.querySelector('input[name="yoffset"]') as HTMLInputElement
@@ -18,8 +19,8 @@ const WIDTH = canvas.width * 3;
 const HEIGHT = canvas.height * 3;
 
 const ITERATIONS = 1000;
-const MAX_ELEVATION = 1000;
-const MIN_ELEVATION = -1000;
+const MAX_ELEVATION = 700;
+const MIN_ELEVATION = -700;
 const WORKER_COUNT = 4;
 
 let WATER_LEVEL = 0;
@@ -32,9 +33,9 @@ let ZOOM_LEVEL = 3;
 
 // Spectrum from dark blue to light green
 const GROUND_COLOR_BOUNDS = {
-	red: [15, 201],
-	green: [132, 192],
-	blue: [13, 124],
+	red: [15, 255],
+	green: [132, 212],
+	blue: [13, 0],
 };
 
 const MOUNTAIN_COLOR_BOUNDS = {
@@ -76,6 +77,8 @@ function generateFull(heightMap: number[][]) {
 	const before = performance.now();
 	let started = 0;
 	let done = 0;
+	statusDisplay.style.display = 'block';
+	statusDisplay.innerHTML = 'Generating terrain...';
 	const iterationCount = Math.round(ITERATIONS / WORKER_COUNT);
 	for (let i = 1; i < WORKER_COUNT; ++i) {
 		const worker = WORKERS[i];
@@ -88,6 +91,7 @@ function generateFull(heightMap: number[][]) {
 					console.log('Main thread starting');
 					faultGenerator.regenerate(iterationCount);
 					console.log('Main thread complete');
+					statusDisplay.innerHTML = 'Compiling terrain...';
 				}
 			} else if (data['type'] === 'result') {
 				console.log('Got data back');
@@ -102,6 +106,7 @@ function generateFull(heightMap: number[][]) {
 					console.log('Average time', (performance.now() - before) / ITERATIONS);
 					setPercentWater(heightMap, 0.67);
 					paint(heightMap);
+					statusDisplay.style.display = 'none';
 				}
 				worker.removeEventListener('message', listener);
 			}
@@ -204,6 +209,7 @@ function setPercentWater(heightMap: number[][], percent: number) {
 	sortedPixels.sort((a, b) => a - b);
 
 	WATER_LEVEL = sortedPixels[Math.floor(WIDTH * HEIGHT * percent)];
+	console.log('Min:', sortedPixels[0], 'Max:', sortedPixels[WIDTH * HEIGHT - 1]);
 	waterLevelInput.value = WATER_LEVEL.toString();
 }
 

@@ -4,6 +4,8 @@
 	<title>WorldGen</title>
 </head>
 <body>
+	<div id="statusDisplay" style="position: absolute; top: 290px; left: 0; width: 100vw; text-align: center"></div>
+
 	<canvas id="map" width="1200" height="600"></canvas>
 	<form style="float: right" onsubmit="return false">
 		Water level: <input type="range" min="-500" max="500" id="waterlevel" onchange="WorldGen.updateWaterLevel()" />
