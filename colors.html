@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Color Test</title>
+</head>
+<body>
+	<canvas id="canvas" width="500" height="500">
+	<script type="text/javascript">
+		const width = 500, height = 500;
+		const colors = [
+			// 			   deep water       | shallow water    | coastline        | treeline         | mountaintop
+			/* ocean   *///['rgb(  0,117,153)','rgb( 40,201,255)','rgb( 40,201,255)','rgb( 40,201,255)','rgb( 40,201,255)'],
+			/* river   *///['rgb(  0,117,153)','rgb( 40,201,255)','rgb( 40,201,255)','rgb( 40,201,255)','rgb( 40,201,255)'],
+			/* wet     */[/*'rgb( 40,201,255)','rgb( 40,201,255)',*/'rgb( 15,132, 13)','rgb(149,255,145)','rgb(255,255,255)'],
+			/* average */[/*'rgb( 40,201,255)','rgb( 40,201,255)',*/'rgb( 42,173, 38)','rgb( 15,132, 13)','rgb(255,229,145)'],
+			/* dry     */[/*'rgb( 40,201,255)','rgb( 40,201,255)',*/'rgb(255,212,  0)','rgb(209,121,  0)','rgb(142, 83,  0)']
+		];
+		const xStopDistance = Math.floor(width / colors[0].length);
+		const yStopDistance = Math.floor(height / colors.length);
+		const canvas = document.getElementById('canvas');
+		const ctx = canvas.getContext('2d');
+
+		// Draw gradient lines using color stops
+		for (let x = 0; x < colors[0].length; ++x) {
+			const grad = ctx.createLinearGradient(x * xStopDistance, 0, x * xStopDistance, height);
+			for (let y = 0; y < colors.length; ++y) {
+				grad.addColorStop(y / (colors.length-1), colors[y][x]);
+			}
+			ctx.fillStyle = grad;
+			ctx.fillRect(x * xStopDistance, 0, 1, height);
+		}
+
+		// Fill in the space between the lines using computed gradients
+		const imageData = ctx.getImageData(0, 0, width, height).data;
+		for (let y = 0; y < height; y++) {
+			const grad = ctx.createLinearGradient(0, y, width, y);
+			for (let x = 0; x < colors[0].length; ++x) {
+				const baseCoord = 4 * (y * width + x * xStopDistance);
+				const r = imageData[baseCoord], g = imageData[baseCoord + 1], b = imageData[baseCoord + 2]
+				grad.addColorStop(x / (colors[0].length-1), `rgb(${r}, ${g}, ${b})`);
+			}
+			ctx.fillStyle = grad;
+			ctx.fillRect(0, y, width, 1);
+		}
+	</script>
+</body>
+</html>

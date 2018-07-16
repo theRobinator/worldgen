@@ -1,4 +1,7 @@
-import {FaultGenerator} from './faultgenerator.js';
+import {FaultGenerator} from './faultgenerator';
+import {MoistureGenerator} from './moisturegenerator';
+import {getLandColor} from './colormap';
+import {Settings} from './settings';
 
 
 const WorldGen: {[key: string]: any} = {};
@@ -7,6 +10,7 @@ window.WorldGen = WorldGen;
 const canvas = document.getElementById('map') as HTMLCanvasElement;
 const context = canvas.getContext('2d');
 const elevation: number[][] = [];
+const moistureMap: number[][] = [];
 
 const WORKERS: Worker[] = [];
 
@@ -19,11 +23,8 @@ const WIDTH = canvas.width * 3;
 const HEIGHT = canvas.height * 3;
 
 const ITERATIONS = 1000;
-const MAX_ELEVATION = 700;
-const MIN_ELEVATION = -700;
 const WORKER_COUNT = 4;
-
-let WATER_LEVEL = 0;
+const startingMoisture = Settings.MAX_MOISTURE / 2;
 let MOUNTAIN_LEVEL = 150;
 
 let X_OFFSET = 0;
@@ -56,19 +57,24 @@ const faultGenerator = new FaultGenerator(WIDTH, HEIGHT, elevation);
 for (let i = 0; i < WORKER_COUNT; ++i) {
 	WORKERS.push(new Worker('/workerbase.js'));
 }
+//const moistureGenerator = new MoistureGenerator(elevation);
+//const moistureMap = moistureGenerator.getMap();
+const moistureGenerator = new FaultGenerator(WIDTH, HEIGHT, moistureMap, startingMoisture);
 
 function reset() {
-	WATER_LEVEL = 0;
+	Settings.WATER_LEVEL = 0;
 	X_OFFSET = 0;
 	Y_OFFSET = 0;
 	yOffsetInput.value = Y_OFFSET + '';
 	xOffsetInput.value = X_OFFSET + '';
-	waterLevelInput.value = WATER_LEVEL + '';
+	waterLevelInput.value = Settings.WATER_LEVEL + '';
 
 	for (let x = 0; x < WIDTH; ++x) {
 		elevation[x] = [];
+		moistureMap[x] = [];
 		for (let y = 0; y < HEIGHT; ++y) {
 			elevation[x][y] = 0;
+			moistureMap[x][y] = startingMoisture;
 		}
 	}
 }
@@ -96,6 +102,7 @@ function generateFull(heightMap: number[][]) {
 			} else if (data['type'] === 'result') {
 				console.log('Got data back');
 				const elevationDelta = data['data'];
+				const MAX_ELEVATION = Settings.MAX_ELEVATION, MIN_ELEVATION = Settings.MIN_ELEVATION;
 				for (let x = 0; x < WIDTH; ++x) {
 					for (let y = 0; y < HEIGHT; ++y) {
 						heightMap[x][y] = Math.max(Math.min(heightMap[x][y] + elevationDelta[x][y], MAX_ELEVATION), MIN_ELEVATION);
@@ -104,9 +111,20 @@ function generateFull(heightMap: number[][]) {
 				done++;
 				if (done === WORKER_COUNT - 1) {
 					console.log('Average time', (performance.now() - before) / ITERATIONS);
-					setPercentWater(heightMap, 0.67);
-					paint(heightMap);
-					statusDisplay.style.display = 'none';
+					statusDisplay.innerHTML = 'Computing rainfall...';
+					setTimeout(() => {
+						setPercentWater(heightMap, 0.67);
+						// moistureGenerator.generate(ITERATIONS, Settings.WATER_LEVEL, 0, 0, WIDTH, HEIGHT);
+						moistureGenerator.regenerate(250);
+						// const MAX_MOISTURE = Settings.MAX_MOISTURE;
+						// for (let x = 0; x < WIDTH; ++x) {
+						// 	for (let y = 0; y < HEIGHT; ++y) {
+						// 		moistureMap[x][y] = Math.max(Math.min(moistureMap[x][y], MAX_MOISTURE), 0);
+						// 	}
+						// }
+						paint(heightMap);
+						statusDisplay.style.display = 'none';
+					}, 10);
 				}
 				worker.removeEventListener('message', listener);
 			}
@@ -129,10 +147,12 @@ function paint(heightMap: number[][]) {
 			const xCoord = (ZOOM_LEVEL * (x + WIDTH) + X_OFFSET) % WIDTH;
 
 			let aggregatedElevation = 0;
+			let aggregatedMoisture = 0;
 			let nextX, nextY;
 			switch (ZOOM_LEVEL) {
 				case 1:
 					aggregatedElevation = heightMap[xCoord][yCoord];
+					aggregatedMoisture = moistureMap[xCoord][yCoord];
 					break;
 				case 2:
 					nextX = (xCoord + 1) % WIDTH;
@@ -141,6 +161,10 @@ function paint(heightMap: number[][]) {
 										+ heightMap[nextX][yCoord]
 										+ heightMap[xCoord][nextY]
 										+ heightMap[nextX][nextY];
+					aggregatedMoisture  = moistureMap[xCoord][yCoord]
+										+ moistureMap[nextX][yCoord]
+										+ moistureMap[xCoord][nextY]
+										+ moistureMap[nextX][nextY];
 					break;
 				case 3:
 					nextX = (xCoord + 1) % WIDTH;
@@ -157,11 +181,22 @@ function paint(heightMap: number[][]) {
 										+ heightMap[xCoord][thirdY]
 										+ heightMap[nextX][thirdY]
 										+ heightMap[thirdX][thirdY];
+
+					aggregatedMoisture  = moistureMap[xCoord][yCoord]
+										+ moistureMap[nextX][yCoord]
+										+ moistureMap[thirdX][yCoord]
+										+ moistureMap[xCoord][nextY]
+										+ moistureMap[nextX][nextY]
+										+ moistureMap[thirdX][nextY]
+										+ moistureMap[xCoord][thirdY]
+										+ moistureMap[nextX][thirdY]
+										+ moistureMap[thirdX][thirdY];
 					break;
 
 			}
 
-			const color = colorForElevation(aggregatedElevation / zoomDivisor);
+			//const color = colorForMoisture(aggregatedElevation / zoomDivisor, aggregatedMoisture / zoomDivisor);
+			const color = getLandColor(aggregatedElevation / zoomDivisor, aggregatedMoisture / zoomDivisor);
 			const base = rowOffset + x * 4;
 			dataArr[base] = color[0];  // Red
 			dataArr[base + 1] = color[1];  // Green
@@ -172,28 +207,10 @@ function paint(heightMap: number[][]) {
 	context.putImageData(imageData, 0, 0);
 }
 
-function colorForElevation(elevation: number): [number, number, number] {
-	let bounds;
-	let percentElevation;
-	if (elevation < WATER_LEVEL) {
-		bounds = WATER_COLOR_BOUNDS;
-		percentElevation = (elevation - MIN_ELEVATION) / (WATER_LEVEL - MIN_ELEVATION);
-	// } else if (elevation <= MOUNTAIN_LEVEL) {
-	// 	bounds = GROUND_COLOR_BOUNDS;
-	// 	percentElevation = (elevation - WATER_LEVEL) / (MOUNTAIN_LEVEL - WATER_LEVEL);
-	// } else {
-	// 	bounds = MOUNTAIN_COLOR_BOUNDS;
-	// 	percentElevation = (elevation - MOUNTAIN_LEVEL) / (MAX_ELEVATION - MOUNTAIN_LEVEL);
-	// }
-	} else {
-		bounds = GROUND_COLOR_BOUNDS;
-		percentElevation = (elevation - WATER_LEVEL) / (MAX_ELEVATION - WATER_LEVEL);
-	}
-	return [
-		(bounds.red[0] + (bounds.red[1] - bounds.red[0]) * percentElevation) | 0,
-		(bounds.green[0] + (bounds.green[1] - bounds.green[0]) * percentElevation) | 0,
-		(bounds.blue[0] + (bounds.blue[1] - bounds.blue[0]) * percentElevation) | 0,
-	];
+function colorForMoisture(elevation: number, moisture: number): [number, number, number] {
+	const max = 1000;
+	const scaled = 255 - (Math.min(moisture, max) * 255 / max)|0;
+	return [scaled, scaled, scaled];
 }
 
 function setPercentWater(heightMap: number[][], percent: number) {
@@ -208,14 +225,14 @@ function setPercentWater(heightMap: number[][], percent: number) {
 	}
 	sortedPixels.sort((a, b) => a - b);
 
-	WATER_LEVEL = sortedPixels[Math.floor(WIDTH * HEIGHT * percent)];
+	Settings.WATER_LEVEL = sortedPixels[Math.floor(WIDTH * HEIGHT * percent)];
 	console.log('Min:', sortedPixels[0], 'Max:', sortedPixels[WIDTH * HEIGHT - 1]);
-	waterLevelInput.value = WATER_LEVEL.toString();
+	waterLevelInput.value = Settings.WATER_LEVEL.toString();
 }
 
 function updateWaterLevel() {
-	WATER_LEVEL = parseInt(waterLevelInput.value);
-	MOUNTAIN_LEVEL = WATER_LEVEL + 150;
+	Settings.WATER_LEVEL = parseInt(waterLevelInput.value);
+	MOUNTAIN_LEVEL = Settings.WATER_LEVEL + 150;
 	paint(elevation);
 }
 WorldGen['updateWaterLevel'] = updateWaterLevel;

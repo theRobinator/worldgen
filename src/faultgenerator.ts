@@ -1,11 +1,14 @@
 export class FaultGenerator {
 	private heightMap: number[][] = [];
+	private startingHeight: number;
 
 	constructor(
 		private mapWidth: number,
 		private mapHeight: number,
 		heightMap?: number[][],
+		startingHeight?: number,
 	) {
+		this.startingHeight = startingHeight || 0;
 		if (heightMap) {
 			this.heightMap = heightMap;
 		} else {
@@ -21,8 +24,9 @@ export class FaultGenerator {
 
 	private resetHeightMap = function() {
 		const heightMap = this.heightMap;
+		const startingHeight = this.startingHeight;
 		for (let x = 0; x < this.mapWidth; ++x) {
-			heightMap[x].fill(0);
+			heightMap[x].fill(startingHeight);
 		}
 	}
 
