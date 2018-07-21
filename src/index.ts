@@ -1,5 +1,5 @@
 import {FaultGenerator} from './faultgenerator';
-import {MoistureGenerator} from './moisturegenerator';
+import {RiverGenerator} from './rivergenerator';
 import {getLandColor} from './colormap';
 import {Settings} from './settings';
 
@@ -57,7 +57,7 @@ const faultGenerator = new FaultGenerator(WIDTH, HEIGHT, elevation);
 for (let i = 0; i < WORKER_COUNT; ++i) {
 	WORKERS.push(new Worker('/workerbase.js'));
 }
-const riverGenerator = new MoistureGenerator(elevation, moistureMap);
+const riverGenerator = new RiverGenerator(elevation, moistureMap);
 const moistureGenerator = new FaultGenerator(WIDTH, HEIGHT, moistureMap, startingMoisture);
 
 function reset() {

@@ -1,7 +1,7 @@
 import {Settings} from './settings';
 
 
-export class MoistureGenerator {
+export class RiverGenerator {
 	private moistureMap: number[][];
 
 	constructor(private heightMap: number[][], externalMoistureMap?: number[][]) {

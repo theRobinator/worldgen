@@ -7,7 +7,7 @@ const waterBounds = {
 	green: [17, 201],
 	blue: [153, 255],
 };
-const FRESHWATER_COLOR = [66, 214, 217];
+const FRESHWATER_COLOR: [number, number, number] = [66, 214, 217];
 const landColors = [
 	// 			   deep water       | shallow water    | coastline        | treeline         | mountaintop
 	/* dry     */[/*'rgb( 40,201,255)','rgb( 40,201,255)',*/'rgb(122, 93,  10)','rgb(189,121,  0)','rgb(202,202,  9)'],
