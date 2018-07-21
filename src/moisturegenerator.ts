@@ -21,74 +21,64 @@ export class MoistureGenerator {
 		}
 	}
 
-	private resetMoistureMap() {
-		const moistureMap = this.moistureMap;
-		for (let x = 0; x < this.heightMap.length; ++x) {
-			moistureMap[x].fill(0);
-		}
-	}
-
 	public getMap() {
 		return this.moistureMap;
 	}
 
 	public generate(iterations: number, waterLevel: number, minX: number, minY: number, maxX: number, maxY: number) {
-		this.resetMoistureMap();
-
 		const heightMap = this.heightMap;
 		const moistureMap = this.moistureMap;
 		const mapWidth = heightMap.length, mapHeight = heightMap[0].length;
 		const maxXOver2 = maxX / 2;
 		const maxMoisture = Settings.MAX_MOISTURE;
-		for (let startX = minX; startX < maxX; ++startX) {
-			if (startX < maxXOver2) {
-				const moistureLevel = startX / maxXOver2 * maxMoisture;
-				for (let startY = minY; startY < maxY; ++startY) {
-					moistureMap[startX][startY] = moistureLevel;
+
+		for (let riverCount = 0; riverCount < iterations; ++riverCount) {
+			let startX = (Math.random() * mapWidth)|0;
+			let startY = (Math.random() * mapHeight)|0;
+
+			if (heightMap[startX][startY] < waterLevel) {
+				riverCount--;
+				continue;
+			}
+
+			let rainAmount = Settings.MAX_MOISTURE + 200;
+			moistureMap[startX][startY] += rainAmount;
+
+			// Keep going downhill
+			let x = startX, y = startY;
+			while (rainAmount > 0) {
+				let minHeight = heightMap[x][y] + moistureMap[x][y];
+				let minX = x, minY = y;
+				for (let i = -1; i < 2; ++i) {
+					for (let j = -1; j < 2; ++j) {
+						const testX = (x + mapWidth + i) % mapWidth;
+						const testY = (y + mapHeight + j) % mapHeight;
+						const thisHeight = heightMap[testX][testY] + moistureMap[testX][testY];
+						if (thisHeight < minHeight) {
+							minHeight = thisHeight;
+							minX = (x + i + mapWidth) % mapWidth;
+							minY = (y + j + mapHeight) % mapHeight;
+						}
+					}
 				}
-			} else {
-				const moistureLevel = (maxX - startX) / maxXOver2 * maxMoisture;
-				for (let startY = minY; startY < maxY; ++startY) {
-					moistureMap[startX][startY] = moistureLevel;
+				if (heightMap[minX][minY] <= waterLevel || (minX == x && minY == y)) {
+					break;
+				} else {
+					x = minX;
+					y = minY;
+					moistureMap[x][y] += rainAmount;
+					rainAmount--;
 				}
 			}
-				
-			// 	moistureMap[startX][startY] += rainAmount;
-
-			// 	// Keep going downhill
-			// 	let x = startX, y = startY;
-			// 	while (true) {
-			// 		let minHeight = heightMap[x][y];
-			// 		let minX = x, minY = y;
-			// 		for (let i = -1; i < 2; ++i) {
-			// 			for (let j = -1; j < 2; ++j) {
-			// 				const testX = (x + mapWidth + i) % mapWidth;
-			// 				const testY = (y + mapHeight + j) % mapHeight;
-			// 				const thisHeight = heightMap[testX][testY];
-			// 				if (thisHeight < minHeight) {
-			// 					minHeight = thisHeight;
-			// 					minX = (x + i + mapWidth) % mapWidth;
-			// 					minY = (y + j + mapHeight) % mapHeight;
-			// 				}
-			// 			}
-			// 		}
-			// 		if (heightMap[minX][minY] <= waterLevel || (minX == x && minY == y)) {
-			// 			break;
-			// 		} else {
-			// 			x = minX;
-			// 			y = minY;
-			// 			moistureMap[x][y] += rainAmount;
-			// 		}
-			// 	}
-			// }
 		}
-		// let min = Infinity, max = -Infinity, maxAllowed = Settings.MAX_MOISTURE;
-		// for (let x = minX; x < maxX; ++x) {
-		// 	for (let y = minY; y < maxY; ++y) {
-		// 		if (moistureMap[x][y] >= maxAllowed) {
-		// 			moistureMap[x][y] = maxAllowed - 1;
-		// 		}
-		// 	}
-		// }
+		
+		let min = Infinity, max = -Infinity, maxAllowed = Settings.MAX_MOISTURE;
+		for (let x = minX; x < maxX; ++x) {
+			for (let y = minY; y < maxY; ++y) {
+				if (moistureMap[x][y] >= maxAllowed) {
+					moistureMap[x][y] = maxAllowed;
+				}
+			}
+		}
 	}
 }

@@ -57,8 +57,7 @@ const faultGenerator = new FaultGenerator(WIDTH, HEIGHT, elevation);
 for (let i = 0; i < WORKER_COUNT; ++i) {
 	WORKERS.push(new Worker('/workerbase.js'));
 }
-//const moistureGenerator = new MoistureGenerator(elevation);
-//const moistureMap = moistureGenerator.getMap();
+const riverGenerator = new MoistureGenerator(elevation, moistureMap);
 const moistureGenerator = new FaultGenerator(WIDTH, HEIGHT, moistureMap, startingMoisture);
 
 function reset() {
@@ -114,8 +113,9 @@ function generateFull(heightMap: number[][]) {
 					statusDisplay.innerHTML = 'Computing rainfall...';
 					setTimeout(() => {
 						setPercentWater(heightMap, 0.67);
-						// moistureGenerator.generate(ITERATIONS, Settings.WATER_LEVEL, 0, 0, WIDTH, HEIGHT);
-						moistureGenerator.regenerate(250);
+						moistureGenerator.regenerate(150);
+						riverGenerator.generate(100, Settings.WATER_LEVEL, 0, 0, WIDTH, HEIGHT);
+						
 						// const MAX_MOISTURE = Settings.MAX_MOISTURE;
 						// for (let x = 0; x < WIDTH; ++x) {
 						// 	for (let y = 0; y < HEIGHT; ++y) {

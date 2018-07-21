@@ -7,6 +7,7 @@ const waterBounds = {
 	green: [17, 201],
 	blue: [153, 255],
 };
+const FRESHWATER_COLOR = [66, 214, 217];
 const landColors = [
 	// 			   deep water       | shallow water    | coastline        | treeline         | mountaintop
 	/* dry     */[/*'rgb( 40,201,255)','rgb( 40,201,255)',*/'rgb(122, 93,  10)','rgb(189,121,  0)','rgb(202,202,  9)'],
@@ -62,7 +63,7 @@ export function getLandColor(elevation: number, moisture: number): [number, numb
 	} else {
 		const percentMoisture = moisture / MAX_MOISTURE;
 		if (percentMoisture >= 1) {
-			return [waterBounds.red[1], waterBounds.green[1], waterBounds.blue[1]];
+			return FRESHWATER_COLOR;
 		}
 		const mapX = ((elevation - waterLevel) / (MAX_ELEVATION - waterLevel) * colorMapWidth)|0;
 		const mapY = (percentMoisture * colorMapHeight)|0;
